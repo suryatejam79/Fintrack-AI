@@ -132,12 +132,13 @@ def verify_otp():
         print(pending_users)
         conn = sqlite3.connect("fintraclai.db")
         cur = conn.cursor()
-        cur.execute("select max(user_id) from user")
-        x1 = cur.fetchall()
+        cur.execute("select max(OTP_ID) from verification")
+        x2 = cur.fetchall()
+        
         cur.execute(f'''
-            INSERT INTO USER VALUES({x1[0][0]+1},"{registered_users[email]['name']}",
-            "{registered_users[email]['gender']}","{registered_users[email]['email']}",
-            "{registered_users[email]['password']}","{datetime.datetime.now()}")
+            INSERT INTO USER VALUES({x2[0][0]+1},{x1[0][0]+1},pending_users[email]['otp'],
+            pending_users[email][expires_at],"{datetime.datetime.now()}",
+            "verified")
             ''')
         conn.commit()
 
