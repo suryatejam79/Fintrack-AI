@@ -1,9 +1,10 @@
 from flask import Flask, render_template, request, jsonify
-from werkzeug.security import generate_password_hash
+from werkzeug.security import generate_password_hash,check_password_hash
 import random
 import time
 import sqlite3
 import datetime
+import smtplib
 
 app = Flask(__name__)
 
@@ -33,6 +34,30 @@ def home():
 def signup_page():
     return render_template("signup.html")
 
+@app.route("/login", methods=["GET", "POST"])
+def login():
+    error = None
+
+    if request.method == "POST":
+        user_email = request.form.get("email", "").strip()
+        user_password = request.form.get("password", "").strip()
+
+        # Check email first
+        conn=sqlite3.connect('fintraclai.db')
+        cur=conn.cursor()
+        cur.execute("SELECT EMAIL,PASSWORD_HASH FROM USER")
+        x3 = dict(cur.fetchall())
+
+        if user_email in x3:
+            # Check hashed password
+            if check_password_hash(x3[user_email], user_password):
+                return render_template("dashboard.html", user_email=user_email)
+            else:
+                error = "Invalid password."
+        else:
+            error = "Invalid email."
+
+    return render_template("login.html", error=error)
 
 @app.route("/send-otp", methods=["POST"])
 def send_otp():
@@ -75,6 +100,18 @@ def send_otp():
         print("\n" + "=" * 60)
         print(f"CORRECT OTP for {email}: {otp}")
         print("=" * 60 + "\n")
+        sender_email = "suryatejau55794@gmail.com"
+        app_password = "bnjx rako znzj awhy"
+
+        subject = "OTP Verification"
+        body = f"Your OTP is: {otp}"
+        message = f"Subject: {subject}\nTo: {email}\nFrom: {sender_email}\n\n{body}"
+
+        server = smtplib.SMTP("smtp.gmail.com",587)
+        server.starttls()
+        server.login(sender_email,app_password)
+        server.sendmail(sender_email,email,message)
+        server.quit()
 
         return jsonify({
             "success": True,
@@ -129,16 +166,12 @@ def verify_otp():
             ''')
         conn.commit()
 
-        print(pending_users)
-        conn = sqlite3.connect("fintraclai.db")
-        cur = conn.cursor()
-        cur.execute("select max(OTP_ID) from verification")
+        cur.execute("select max(otp_id) from VERIFICATION")
         x2 = cur.fetchall()
-        
         cur.execute(f'''
-            INSERT INTO USER VALUES({x2[0][0]+1},{x1[0][0]+1},pending_users[email]['otp'],
-            pending_users[email][expires_at],"{datetime.datetime.now()}",
-            "verified")
+            INSERT INTO VERIFICATION VALUES({x2[0][0]+1},{x1[0][0]+1},
+            {pending_users[email]['otp']},"{pending_users[email]['expires_at']}",
+            "{datetime.datetime.now()}","verified")
             ''')
         conn.commit()
 
