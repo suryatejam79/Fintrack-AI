@@ -58,6 +58,80 @@ def login():
             error = "Invalid email."
 
     return render_template("login.html", error=error)
+@app.route("/income", methods=["GET", "POST"])
+def income():
+    if request.method == "GET":
+        return render_template("income.html")
+
+    email = request.form.get("email", "").strip()
+    income_type = request.form.get("income_type", "").strip()
+    monthly_income = request.form.get("monthly_income", "").strip()
+    additional_income_type = request.form.get("additional_income_type", "").strip()
+    additional_monthly_income = request.form.get("additional_monthly_income", "").strip()
+    dependants = request.form.get("dependants", "").strip()
+
+    conn = sqlite3.connect('fintraclai.db')
+    cur = conn.cursor()
+    cur.execute("SELECT EMAIL,PASSWORD_HASH FROM USER")
+    x = dict(cur.fetchall())
+
+    if email not in x:
+        return render_template("income.html", error="Email is required.")
+
+    try:
+
+        # Assumption: USER table contains EMAIL column
+        cur.execute("SELECT USER_ID FROM USER WHERE EMAIL = ?", (email,))
+        user_row = cur.fetchone()
+
+        if not user_row:
+            conn.close()
+            return render_template("income.html", error="No user found with this email.")
+
+        user_id = user_row[0]
+        now = datetime.datetime.now()
+        profile_id = cur.execute("SELECT max(PROFILE_ID) FROM INCOMEPROFILE")
+        x = cur.fetchall()
+        if x[0][0]==None:
+            x = 1
+        else:
+            x = x[0][0]+1
+
+        cur.execute("""
+            INSERT INTO INCOMEPROFILE (
+                PROFILE_ID,
+                USER_ID,
+                INCOME_TYPE,
+                MONTHLY_INCOME,
+                ADDITIONAL_INCOME_TYPE,
+                ADDITIONAL_MONTHLY_INCOME,
+                DEPENDANTS,
+                CREATED_AT,
+                UPDATED_AT
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """, (
+            int(x),
+            int(user_id),
+            income_type,
+            float(monthly_income),
+            additional_income_type,
+            float(additional_monthly_income),
+            int(dependants),
+            now,
+            now
+        ))
+
+        conn.commit()
+        conn.close()
+
+        return render_template("income.html", success="Income profile saved successfully.")
+
+    except sqlite3.IntegrityError as e:
+        return render_template("income.html", error=f"Database integrity error: {str(e)}")
+
+    except Exception as e:
+        return render_template("income.html", error=f"Error: {str(e)}")
 
 @app.route("/send-otp", methods=["POST"])
 def send_otp():
