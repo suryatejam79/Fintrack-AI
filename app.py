@@ -132,6 +132,94 @@ def income():
 
     except Exception as e:
         return render_template("income.html", error=f"Error: {str(e)}")
+@app.route("/expense", methods=["GET", "POST"])
+def expense():
+    if request.method == "GET":
+        return render_template("expense.html")
+
+    email = request.form.get("email", "").strip()
+    groceries = request.form.get("groceries", "").strip()
+    travel = request.form.get("travel", "").strip()
+    medfit = request.form.get("medfit", "").strip()
+    lep = request.form.get("lep", "").strip()
+    monthly_rent = request.form.get("monthly_rent", "").strip()
+    m_bills = request.form.get("m_bills", "").strip()
+    fashion = request.form.get("fashion", "").strip()
+    entertainment = request.form.get("entertainment", "").strip()
+    education = request.form.get("education", "").strip()
+    emsaving = request.form.get("emsaving", "").strip()
+    miscellaneous = request.form.get("miscellaneous", "").strip()
+
+    if not email:
+        return render_template("expense.html", error="Email is required.")
+
+    try:
+        conn = sqlite3.connect("fintraclai.db")
+        cur = conn.cursor()
+
+        cur.execute("SELECT USER_ID FROM USER WHERE EMAIL = ?", (email,))
+        user_row = cur.fetchone()
+
+        if not user_row:
+            conn.close()
+            return render_template("expense.html", error="No user found with this email.")
+
+        user_id = user_row[0]
+        expense_id = cur.execute("SELECT max(expense_ID) FROM expensePROFILE")
+        x = cur.fetchall()
+        if x[0][0]==None:
+            x = 1
+        else:
+            x = x[0][0]+1
+
+        print(x,user_id,email,groceries,travel,medfit,lep,monthly_rent,m_bills,fashion,entertainment,education,emsaving,miscellaneous)
+        cur.execute("""
+            INSERT INTO EXPENSEPROFILE (
+                Expense_ID,
+                USER_ID,
+                GROCERIES,
+                TRAVEL,
+                MEDFIT,
+                LEP,
+                MONTHLY_RENT,
+                M_BILLS,
+                FASHION,
+                ENTERTAINMENT,
+                EDUCATION,
+                EMSAVING,
+                MISCELLANEOUS,
+                CREATED_AT
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,?)
+        """, (
+            x,
+            int(user_id),
+            float(groceries),
+            float(travel),
+            float(medfit),
+            float(lep),
+            float(monthly_rent),
+            float(m_bills),
+            float(fashion),
+            float(entertainment),
+            float(education),
+            float(emsaving),
+            float(miscellaneous),
+            datetime.datetime.now()
+        ))
+
+        conn.commit()
+        conn.close()
+
+        return render_template("expense.html", success="Expense profile saved successfully.")
+
+    except sqlite3.IntegrityError as e:
+        return render_template("expense.html", error=f"Database integrity error: {str(e)}")
+    except ValueError:
+        return render_template("expense.html", error="Please enter valid numeric values in all amount fields.")
+    except Exception as e:
+        return render_template("expense.html", error=f"Error: {str(e)}")
+
 
 @app.route("/send-otp", methods=["POST"])
 def send_otp():
@@ -194,7 +282,6 @@ def send_otp():
 
     except Exception as e:
         return jsonify({"success": False, "message": f"Error: {str(e)}"}), 500
-
 
 @app.route("/verify-otp", methods=["POST"])
 def verify_otp():
