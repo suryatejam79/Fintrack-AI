@@ -346,7 +346,7 @@ def send_otp():
             "expires_at": time.time() + OTP_EXPIRY_SECONDS
         }
 
-        api_key = os.environment.get("BREVO_API_KEY")
+        api_key = os.environ.get("BREVO_API_KEY")
         if not api_key:
             return jsonify({"message": "Email service not configured"}), 500
 
