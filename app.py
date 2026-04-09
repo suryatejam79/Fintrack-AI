@@ -436,7 +436,7 @@ def verify_otp():
         cur.execute(f'''
             INSERT INTO VERIFICATION VALUES({x2[0][0]+1},{x1[0][0]+1},
             {pending_users[email]['otp']},"{pending_users[email]['expires_at']}",
-            "{datetime.datetime.now()}","VERIFIED")
+            "{datetime.datetime.now()}","verified")
             ''')
         conn.commit()
 
