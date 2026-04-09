@@ -6,6 +6,7 @@ import time
 import sqlite3
 import datetime
 import smtplib
+import os 
 
 app = Flask(__name__)
 
@@ -322,65 +323,68 @@ def goals():
 @app.route("/send-otp", methods=["POST"])
 def send_otp():
     try:
+        import requests as http_requests
+        import random, time
+
         data = request.get_json()
+        name     = data.get("name", "").strip()
+        email    = data.get("email", "").strip()
+        gender   = data.get("gender")
+        password = data.get("password")
 
-        name = data.get("name", "").strip()
-        email = data.get("email", "").strip().lower()
-        gender = data.get("gender", "").strip()
-        password = data.get("password", "")
-        confirm_password = data.get("confirmPassword", "")
+        if not name or not email:
+            return jsonify({"message": "Name and email required"}), 400
 
-        if not name or not email or not gender or not password or not confirm_password:
-            return jsonify({"success": False, "message": "All fields are required."}), 400
-
-        if gender not in ["Male", "Female"]:
-            return jsonify({"success": False, "message": "Invalid gender selected."}), 400
-
-        if password != confirm_password:
-            return jsonify({"success": False, "message": "Passwords do not match."}), 400
-
-        if len(password) < 6:
-            return jsonify({"success": False, "message": "Password must be at least 6 characters."}), 400
-        print(email,reg)
-        if email in reg:
-            return jsonify({"success": False, "message": "User already registered with this email."}), 400
-
-        otp = generate_otp()
-        expires_at = time.time() + OTP_EXPIRY_SECONDS
+        otp = str(random.randint(1000, 9999))
 
         pending_users[email] = {
             "name": name,
-            "email": email,
             "gender": gender,
+            "email": email,
             "password": password,
             "otp": otp,
-            "expires_at": expires_at
+            "expires_at": time.time() + OTP_EXPIRY_SECONDS
         }
 
-        print("\n" + "=" * 60)
-        print(f"CORRECT OTP for {email}: {otp}")
-        print("=" * 60 + "\n")
-        sender_email = "suryatejau55794@gmail.com"
-        app_password = "pdfj ngoc rzzd ieqe"
+        api_key = os.environment.get("BREVO_API_KEY")
+        if not api_key:
+            return jsonify({"message": "Email service not configured"}), 500
 
-        subject = "OTP Verification"
-        body = f"Your OTP is: {otp}"
-        message = f"Subject: {subject}\nTo: {email}\nFrom: {sender_email}\n\n{body}"
+        response = http_requests.post(
+            "https://api.brevo.com/v3/smtp/email",
+            headers={
+                "api-key": api_key,
+                "Content-Type": "application/json"
+            },
+            json={
+                "sender": {"name": "FinTrack AI", "email": "suryatejau55794@gmail.com"},
+                "to": [{"email": email, "name": name}],
+                "subject": "Your FinTrack AI OTP Code",
+                "htmlContent": f"""
+                    <div style="font-family:sans-serif;max-width:400px;margin:auto;padding:32px;
+                                background:#0a0820;color:#ede8ff;border-radius:16px;">
+                        <h2 style="color:#a78bfa">FinTrack AI</h2>
+                        <p>Hi <strong>{name}</strong>, your OTP verification code is:</p>
+                        <h1 style="font-size:3rem;letter-spacing:12px;color:#7c3aed;
+                                   text-align:center;padding:16px 0">{otp}</h1>
+                        <p style="color:#9d8ec4">This code expires in 5 minutes.<br/>
+                        If you did not request this, ignore this email.</p>
+                    </div>
+                """
+            },
+            timeout=10
+        )
 
-        server = smtplib.SMTP("smtp.gmail.com",587)
-        server.starttls()
-        server.login(sender_email,app_password)
-        server.sendmail(sender_email,email,message)
-        server.quit()
+        if response.status_code not in [200, 201]:
+            print("BREVO API ERROR:", response.text)
+            return jsonify({"message": "Failed to send OTP. Try again."}), 500
 
-        return jsonify({
-            "success": True,
-            "message": "OTP generated successfully. Please enter OTP."
-        }), 200
+        print("OTP EMAIL SENT SUCCESSFULLY via Brevo API")
+        return jsonify({"message": "OTP sent successfully"}), 200
 
     except Exception as e:
-        return jsonify({"success": False, "message": f"Error: {str(e)}"}), 500
-
+        print("SEND-OTP ERROR:", str(e))
+        return jsonify({"message": f"Error: {str(e)}"}), 500
 
 @app.route("/verify-otp", methods=["POST"])
 def verify_otp():
